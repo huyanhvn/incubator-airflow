@@ -1285,6 +1285,26 @@ class SchedulerJobTest(unittest.TestCase):
     def _make_simple_dag_bag(self, dags):
         return SimpleDagBag([SimpleDag(dag) for dag in dags])
 
+    def test_example_dags_scheduled_when_dag_folder_empty(self):
+        """
+        When dag_folder is empty or non-existent (usually after first install),
+        example_dags (if enabled) should be scheduled by scheduler still
+        """
+        empty_dir = mkdtemp()
+        scheduler = SchedulerJob(subdir=empty_dir,
+                                 dag_id='example_bash_operator',
+                                 include_examples=True,
+                                 num_runs=1)
+        scheduler.run()
+        shutil.rmtree(empty_dir)
+
+        session = settings.Session()
+        dag_run = session.query(DagRun).filter(
+            DagRun.dag_id == 'example_bash_operator'
+        ).first()
+
+        self.assertEqual(dag_run.state, State.SUCCESS)
+
     def test_no_orphan_process_will_be_left(self):
         empty_dir = mkdtemp()
         current_process = psutil.Process()
@@ -2762,6 +2782,7 @@ class SchedulerJobTest(unittest.TestCase):
             # try to schedule the above DAG repeatedly.
             scheduler = SchedulerJob(num_runs=1,
                                      executor=executor,
+                                     include_examples=False,
                                      subdir=os.path.join(settings.DAGS_FOLDER,
                                                          "no_dags.py"))
             scheduler.heartrate = 0

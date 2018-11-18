@@ -546,6 +546,7 @@ class SchedulerJob(BaseJob):
             run_duration=None,
             do_pickle=False,
             log=None,
+            include_examples=conf.getboolean('core', 'LOAD_EXAMPLES'),
             *args, **kwargs):
         """
         :param dag_id: if specified, only schedule tasks with this DAG ID
@@ -566,6 +567,8 @@ class SchedulerJob(BaseJob):
         :param do_pickle: once a DAG object is obtained by executing the Python
             file, whether to serialize the DAG object to the DB
         :type do_pickle: bool
+        :param include_examples: whether to include 'example_dags' dir in DAG paths
+        :type include_examples: boolean
         """
         # for BaseJob compatibility
         self.dag_id = dag_id
@@ -584,6 +587,8 @@ class SchedulerJob(BaseJob):
 
         self.heartrate = conf.getint('scheduler', 'SCHEDULER_HEARTBEAT_SEC')
         self.max_threads = conf.getint('scheduler', 'max_threads')
+
+        self.include_examples = include_examples
 
         if log:
             self._log = log
@@ -1488,6 +1493,14 @@ class SchedulerJob(BaseJob):
         self.log.info("Searching for files in %s", self.subdir)
         known_file_paths = list_py_file_paths(self.subdir)
         self.log.info("There are %s files in %s", len(known_file_paths), self.subdir)
+
+        if self.include_examples:
+            if not os.path.isdir(self.subdir) or not os.listdir(self.subdir):
+                example_dag_folder = os.path.join(
+                    os.path.dirname(__file__),
+                    'example_dags')
+                self.log.debug("Setting dag folder to {}".format(example_dag_folder))
+                self.subdir = example_dag_folder
 
         def processor_factory(file_path, zombies):
             return DagFileProcessor(file_path,
